@@ -1,5 +1,7 @@
 import asyncio
 import os
+import yaml
+import json
 from dotenv import load_dotenv
 from pydoll.browser.chrome import Chrome
 from pydoll.constants import By
@@ -16,7 +18,168 @@ PAYBACK_PASSWORD = os.getenv("PAYBACK_PASSWORD", "test_password")
 if not PAYBACK_USERNAME or not PAYBACK_PASSWORD:
     print("Warning: PAYBACK_USERNAME and/or PAYBACK_PASSWORD not set in .env file. Using default test values.")
 
+# Load configuration from config.yaml
+def load_config():
+    try:
+        with open("config.yaml", "r") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config.yaml: {e}")
+        return {"merchants": [], "options": {"activation_timeout": 30}}
+
+async def activate_coupons_for_partner(page, partner_name, partner_id):
+    """Activate all coupons for a specific partner"""
+    print(f"\nActivating coupons for {partner_name} (ID: {partner_id})...")
+    
+    # Navigate to the specific partner's coupons page
+    await page.go_to(f"https://www.payback.de/coupons?partnerId={partner_id}")
+    
+    # Wait for the coupons to load
+    print("Waiting for coupons to load...")
+    await asyncio.sleep(5)
+    
+    # Find and click all "Jetzt aktivieren" buttons
+    print("Attempting to activate all coupons...")
+    await page.execute_script("""
+        // Get the coupon center container
+        var couponCenter = document.querySelector("#coupon-center");
+        if (!couponCenter || !couponCenter.shadowRoot) {
+            console.log("Coupon center not found or no shadow root");
+            window.activationResults = { success: false, error: "Coupon center not found", activated: 0, total: 0 };
+        } else {
+            // Find all coupon elements within the container
+            var couponContainer = couponCenter.shadowRoot.querySelector("div > div.coupon-center__container > div.coupon-center__published-column.column--double > div.coupon-center__container-published-coupons");
+            if (!couponContainer) {
+                console.log("Coupon container not found");
+                window.activationResults = { success: false, error: "Coupon container not found", activated: 0, total: 0 };
+            } else {
+                var coupons = couponContainer.querySelectorAll("pbc-coupon");
+                console.log("Found " + coupons.length + " coupons");
+                
+                var activatedCount = 0;
+                
+                // Iterate through each coupon and try to activate it
+                for (var i = 0; i < coupons.length; i++) {
+                    var coupon = coupons[i];
+                    try {
+                        if (coupon.shadowRoot) {
+                            var callToAction = coupon.shadowRoot.querySelector("div > pbc-coupon-call-to-action");
+                            
+                            if (callToAction && callToAction.shadowRoot) {
+                                var button = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.not-activated");
+                                
+                                if (button) {
+                                    console.log("Found activation button for coupon " + (i + 1));
+                                    button.click();
+                                    activatedCount++;
+                                    console.log("Clicked activation button for coupon " + (i + 1));
+                                } else {
+                                    // Check if the button is already activated
+                                    var activatedButton = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.activated");
+                                    if (activatedButton) {
+                                        console.log("Coupon " + (i + 1) + " is already activated");
+                                    } else {
+                                        console.log("Activation button not found for coupon " + (i + 1));
+                                    }
+                                }
+                            } else {
+                                console.log("Call to action element or shadow root not found for coupon " + (i + 1));
+                            }
+                        } else {
+                            console.log("No shadow root for coupon " + (i + 1));
+                        }
+                    } catch (e) {
+                        console.log("Error processing coupon " + (i + 1) + ": " + e.message);
+                    }
+                }
+                
+                // Store results in a global variable instead of returning
+                window.activationResults = { 
+                    success: true, 
+                    activated: activatedCount,
+                    total: coupons.length
+                };
+                console.log("Activation complete. Activated " + activatedCount + " out of " + coupons.length + " coupons");
+            }
+        }
+    """)
+    
+    # Wait a moment for the activations to complete
+    await asyncio.sleep(2)
+    
+    # Get the activation results from the global variable
+    await page.execute_script("""
+        if (window.activationResults) {
+            console.log("Activation results:", window.activationResults);
+            window.activationResultsJSON = JSON.stringify(window.activationResults);
+        } else {
+            console.log("No activation results found");
+            window.activationResultsJSON = JSON.stringify({success: false, error: "No results found"});
+        }
+    """)
+    
+    # Get the results as a JSON string
+    results_json = await page.execute_script("window.activationResultsJSON")
+    
+    # Process the activation results
+    if results_json:
+        try:
+            # Check if results_json is already a dict with 'result' key (pydoll specific format)
+            if isinstance(results_json, dict) and 'result' in results_json:
+                # Extract the actual JSON string from the pydoll result structure
+                json_str = results_json.get('result', {}).get('result', {}).get('value', '{}')
+                results = json.loads(json_str)
+            else:
+                # Try to parse it directly
+                results = json.loads(results_json)
+            
+            if results.get("success"):
+                print(f"Successfully activated {results.get('activated')} out of {results.get('total')} coupons for {partner_name}")
+                return {
+                    "partner_name": partner_name,
+                    "partner_id": partner_id,
+                    "activated": results.get('activated', 0),
+                    "total": results.get('total', 0),
+                    "success": True
+                }
+            else:
+                print(f"Activation failed for {partner_name}: {results.get('error', 'Unknown error')}")
+                return {
+                    "partner_name": partner_name,
+                    "partner_id": partner_id,
+                    "error": results.get('error', 'Unknown error'),
+                    "success": False
+                }
+        except Exception as e:
+            print(f"Error processing activation results for {partner_name}: {e}")
+            return {
+                "partner_name": partner_name,
+                "partner_id": partner_id,
+                "error": str(e),
+                "success": False
+            }
+    else:
+        print(f"Failed to get activation results for {partner_name}")
+        return {
+            "partner_name": partner_name,
+            "partner_id": partner_id,
+            "error": "Failed to get activation results",
+            "success": False
+        }
+
 async def main():
+    # Load configuration
+    config = load_config()
+    merchants = config.get("merchants", [])
+    options = config.get("options", {})
+    activation_timeout = options.get("activation_timeout", 30)
+    
+    if not merchants:
+        print("No merchants found in config.yaml. Please add at least one merchant.")
+        return
+    
+    print(f"Found {len(merchants)} merchants in config.yaml")
+    
     # Create browser options
     options = Options()
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -299,127 +462,47 @@ async def main():
             """)
             
             print("Login completed.")
-            await asyncio.sleep(2)
+            await asyncio.sleep(10)
             
         except Exception as e:
             print(f"Error checking login status: {e}")
+            return
 
-        # Navigate to the specific partner's coupons page
-        print("Navigating to partner's coupons page...")
-        await page.go_to("https://www.payback.de/coupons?partnerId=lp721225")
-        
-        # Wait for the coupons to load
-        print("Waiting for coupons to load...")
-        await asyncio.sleep(5)
-        
-        # Find and click all "Jetzt aktivieren" buttons
-        print("Attempting to activate all coupons...")
-        await page.execute_script("""
-            // Get the coupon center container
-            var couponCenter = document.querySelector("#coupon-center");
-            if (!couponCenter || !couponCenter.shadowRoot) {
-                console.log("Coupon center not found or no shadow root");
-                window.activationResults = { success: false, error: "Coupon center not found", activated: 0, total: 0 };
-            } else {
-                // Find all coupon elements within the container
-                var couponContainer = couponCenter.shadowRoot.querySelector("div > div.coupon-center__container > div.coupon-center__published-column.column--double > div.coupon-center__container-published-coupons");
-                if (!couponContainer) {
-                    console.log("Coupon container not found");
-                    window.activationResults = { success: false, error: "Coupon container not found", activated: 0, total: 0 };
-                } else {
-                    var coupons = couponContainer.querySelectorAll("pbc-coupon");
-                    console.log("Found " + coupons.length + " coupons");
-                    
-                    var activatedCount = 0;
-                    
-                    // Iterate through each coupon and try to activate it
-                    for (var i = 0; i < coupons.length; i++) {
-                        var coupon = coupons[i];
-                        try {
-                            if (coupon.shadowRoot) {
-                                var callToAction = coupon.shadowRoot.querySelector("div > pbc-coupon-call-to-action");
-                                
-                                if (callToAction && callToAction.shadowRoot) {
-                                    var button = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.not-activated");
-                                    
-                                    if (button) {
-                                        console.log("Found activation button for coupon " + (i + 1));
-                                        button.click();
-                                        activatedCount++;
-                                        console.log("Clicked activation button for coupon " + (i + 1));
-                                    } else {
-                                        // Check if the button is already activated
-                                        var activatedButton = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.activated");
-                                        if (activatedButton) {
-                                            console.log("Coupon " + (i + 1) + " is already activated");
-                                        } else {
-                                            console.log("Activation button not found for coupon " + (i + 1));
-                                        }
-                                    }
-                                } else {
-                                    console.log("Call to action element or shadow root not found for coupon " + (i + 1));
-                                }
-                            } else {
-                                console.log("No shadow root for coupon " + (i + 1));
-                            }
-                        } catch (e) {
-                            console.log("Error processing coupon " + (i + 1) + ": " + e.message);
-                        }
-                    }
-                    
-                    // Store results in a global variable instead of returning
-                    window.activationResults = { 
-                        success: true, 
-                        activated: activatedCount,
-                        total: coupons.length
-                    };
-                    console.log("Activation complete. Activated " + activatedCount + " out of " + coupons.length + " coupons");
-                }
-            }
-        """)
-        
-        # Wait a moment for the activations to complete
-        await asyncio.sleep(2)
-        
-        # Get the activation results from the global variable
-        await page.execute_script("""
-            if (window.activationResults) {
-                console.log("Activation results:", window.activationResults);
-                window.activationResultsJSON = JSON.stringify(window.activationResults);
-            } else {
-                console.log("No activation results found");
-                window.activationResultsJSON = JSON.stringify({success: false, error: "No results found"});
-            }
-        """)
-        
-        # Get the results as a JSON string
-        results_json = await page.execute_script("window.activationResultsJSON")
-        
-        # Process the activation results
-        if results_json:
-            try:
-                import json
-                # Check if results_json is already a dict with 'result' key (pydoll specific format)
-                if isinstance(results_json, dict) and 'result' in results_json:
-                    # Extract the actual JSON string from the pydoll result structure
-                    json_str = results_json.get('result', {}).get('result', {}).get('value', '{}')
-                    results = json.loads(json_str)
-                else:
-                    # Try to parse it directly
-                    results = json.loads(results_json)
+        # Process each merchant from the config
+        activation_results = []
+        for merchant in merchants:
+            merchant_name = merchant.get("name", "Unknown")
+            partner_id = merchant.get("partner_id", "")
+            
+            if not partner_id:
+                print(f"Skipping {merchant_name}: No partner_id specified")
+                continue
                 
-                if results.get("success"):
-                    print(f"Successfully activated {results.get('activated')} out of {results.get('total')} coupons")
-                else:
-                    print(f"Activation failed: {results.get('error', 'Unknown error')}")
-            except Exception as e:
-                print(f"Error processing activation results: {e}")
-                print(f"Raw results: {results_json}")
-        else:
-            print("Failed to get activation results")
+            # Activate coupons for this merchant
+            result = await activate_coupons_for_partner(page, merchant_name, partner_id)
+            activation_results.append(result)
+            
+            # Wait a moment before processing the next merchant
+            await asyncio.sleep(2)
         
-        # Wait to see the results
-        print("Waiting to see activation results...")
-        await asyncio.sleep(5)
+        # Print summary of all activations
+        print("\n===== ACTIVATION SUMMARY =====")
+        total_activated = 0
+        total_available = 0
+        
+        for result in activation_results:
+            partner_name = result.get("partner_name", "Unknown")
+            if result.get("success", False):
+                activated = result.get("activated", 0)
+                total = result.get("total", 0)
+                total_activated += activated
+                total_available += total
+                print(f"✅ {partner_name}: Activated {activated} out of {total} coupons")
+            else:
+                error = result.get("error", "Unknown error")
+                print(f"❌ {partner_name}: Failed - {error}")
+        
+        print(f"\nTotal: Activated {total_activated} out of {total_available} coupons across {len(merchants)} merchants")
+        print("===== END OF SUMMARY =====")
 
 asyncio.run(main())
