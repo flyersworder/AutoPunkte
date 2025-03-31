@@ -1,0 +1,25 @@
+# AutoPunkte Configuration
+
+# List of merchants for which to activate coupons
+merchants:
+  - name: Douglas
+    partner_id: lp703660
+  - name: Edeka
+    partner_id: lp747
+  - name: Payback Gutscheine
+    partner_id: lp741
+  - name: Payback Prospekte
+    partner_id: lp570
+  - name: DM
+    partner_id: lp54
+  - name: Decathlon
+    partner_id: lp732
+  # Add more merchants as needed
+  # Partner IDs can be found in the URL when selecting a merchant on the Payback website
+  # For example, https://www.payback.de/coupons?partnerId=lp732 for Decathlon
+
+# Configuration options
+options:
+  notify_on_success: true
+  notify_on_failure: true
+  activation_timeout: 30 # seconds
