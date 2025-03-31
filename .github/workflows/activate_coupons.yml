@@ -1,0 +1,58 @@
+name: Activate Payback Coupons
+
+"on":
+  schedule:
+    # Run every Monday and Thursday at 10:00 AM UTC
+    - cron: "0 10 * * 1,4"
+  workflow_dispatch:
+
+jobs:
+  activate:
+    name: Activate Coupons
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Activate Payback coupons
+        env:
+          PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
+          PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
+        run: |
+          python activate.py --headless
+
+      - name: Upload activation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: activation-logs
+          path: |
+            payback_activation_*.log
+            autopunkte.log
+            activation_results_*.json
+          retention-days: 7
+
+      - name: Upload screenshots and HTML
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: activation-results
+          path: |
+            payback_coupons_*.png
+            payback_coupons_*.html
+          retention-days: 7
