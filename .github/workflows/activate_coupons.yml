@@ -34,7 +34,7 @@ jobs:
           PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
           PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
         run: |
-          python activate.py --headless
+          uv run activate.py --headless
 
       - name: Upload activation logs
         if: always()
