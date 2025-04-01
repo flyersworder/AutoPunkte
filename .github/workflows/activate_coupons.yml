@@ -9,7 +9,7 @@ name: Activate Payback Coupons
 jobs:
   activate:
     name: Activate Coupons
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -20,10 +20,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install system dependencies
+      - name: Install system dependencies for macOS
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb x11-utils x11-xserver-utils libxss1
+          brew install --cask xquartz
+          brew install chrome-cli
 
       - name: Install uv
         run: |
@@ -38,16 +38,12 @@ jobs:
         env:
           PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
           PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
-          DISPLAY: ":99.0"
-          GITHUB_ACTIONS: "true"
         run: |
-          # Start virtual display with larger resolution and color depth
-          Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > /dev/null 2>&1 &
-          # Wait for Xvfb to start
+          # Start virtual display for macOS
+          defaults write org.x.X11 app_to_run /usr/bin/true
+          open -a XQuartz
           sleep 5
-          # Check if display is working
-          xdpyinfo -display :99 > /dev/null || (echo "Xvfb failed to start" && exit 1)
-          # Run without headless flag
+          # Run the activation script
           uv run activate.py
 
       - name: Upload activation logs
