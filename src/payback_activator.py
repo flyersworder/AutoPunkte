@@ -49,6 +49,8 @@ class PaybackActivator:
         self.headless = headless
         self.config = self._load_config()
         self.logger = logging.getLogger("PaybackActivator")
+        # Detect if running in GitHub Actions
+        self.is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
 
     def _load_config(self):
         """Load configuration from config.yaml file."""
@@ -66,9 +68,10 @@ class PaybackActivator:
         # Navigate to the specific partner's coupons page
         await page.go_to(f"https://www.payback.de/coupons?partnerId={partner_id}")
 
-        # Wait for the coupons to load
-        self.logger.info("Waiting for coupons to load...")
-        await asyncio.sleep(5)
+        # Wait longer for coupons to load in GitHub Actions
+        wait_time = 10 if self.is_github_actions else 5
+        self.logger.info(f"Waiting for coupons to load for {wait_time} seconds...")
+        await asyncio.sleep(wait_time)
 
         # Find and click all "Jetzt aktivieren" buttons
         self.logger.info("Attempting to activate all coupons...")
@@ -80,8 +83,22 @@ class PaybackActivator:
                 console.log("Coupon center not found or no shadow root");
                 window.activationResults = { success: false, error: "Coupon center not found", activated: 0, total: 0 };
             } else {
-                // Find all coupon elements within the container
-                var couponContainer = couponCenter.shadowRoot.querySelector("div > div.coupon-center__container > div.coupon-center__published-column.column--double > div.coupon-center__container-published-coupons");
+                // Try multiple selectors for the coupon container to be more robust
+                var selectors = [
+                    "div > div.coupon-center__container > div.coupon-center__published-column.column--double > div.coupon-center__container-published-coupons",
+                    "div > div.coupon-center__container > div.coupon-center__published-column > div.coupon-center__container-published-coupons",
+                    "div.coupon-center__container div.coupon-center__container-published-coupons",
+                    "div.coupon-center__published-column div.coupon-center__container-published-coupons"
+                ];
+
+                var couponContainer = null;
+                for (var i = 0; i < selectors.length && !couponContainer; i++) {
+                    couponContainer = couponCenter.shadowRoot.querySelector(selectors[i]);
+                    if (couponContainer) {
+                        console.log("Found coupon container with selector: " + selectors[i]);
+                    }
+                }
+
                 if (!couponContainer) {
                     console.log("Coupon container not found - this may mean all coupons are already activated");
                     window.activationResults = { success: true, error: "No coupons to activate", activated: 0, total: 0, alreadyActivated: true };
@@ -96,10 +113,45 @@ class PaybackActivator:
                         var coupon = coupons[i];
                         try {
                             if (coupon.shadowRoot) {
-                                var callToAction = coupon.shadowRoot.querySelector("div > pbc-coupon-call-to-action");
+                                // Try multiple selectors for the call to action element
+                                var callToActionSelectors = [
+                                    "div > pbc-coupon-call-to-action",
+                                    "pbc-coupon-call-to-action"
+                                ];
+
+                                var callToAction = null;
+                                for (var j = 0; j < callToActionSelectors.length && !callToAction; j++) {
+                                    callToAction = coupon.shadowRoot.querySelector(callToActionSelectors[j]);
+                                }
 
                                 if (callToAction && callToAction.shadowRoot) {
-                                    var button = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.not-activated");
+                                    // Try multiple selectors for the activation button
+                                    var buttonSelectors = [
+                                        "div > button.coupon-call-to-action__button.coupon__activate-button.not-activated",
+                                        "button.coupon-call-to-action__button.coupon__activate-button.not-activated",
+                                        "button.not-activated",
+                                        "button:not(.activated)"
+                                    ];
+
+                                    var button = null;
+                                    for (var j = 0; j < buttonSelectors.length && !button; j++) {
+                                        button = callToAction.shadowRoot.querySelector(buttonSelectors[j]);
+                                        if (button) {
+                                            console.log("Found activation button with selector: " + buttonSelectors[j] + " for coupon " + (i + 1));
+                                        }
+                                    }
+
+                                    // If still no button found, try to find by text content
+                                    if (!button) {
+                                        var allButtons = callToAction.shadowRoot.querySelectorAll("button");
+                                        for (var j = 0; j < allButtons.length; j++) {
+                                            if (allButtons[j].textContent.toLowerCase().includes("aktivieren")) {
+                                                button = allButtons[j];
+                                                console.log("Found activation button by text content for coupon " + (i + 1));
+                                                break;
+                                            }
+                                        }
+                                    }
 
                                     if (button) {
                                         console.log("Found activation button for coupon " + (i + 1));
@@ -108,7 +160,17 @@ class PaybackActivator:
                                         console.log("Clicked activation button for coupon " + (i + 1));
                                     } else {
                                         // Check if the button is already activated
-                                        var activatedButton = callToAction.shadowRoot.querySelector("div > button.coupon-call-to-action__button.coupon__activate-button.activated");
+                                        var activatedButtonSelectors = [
+                                            "div > button.coupon-call-to-action__button.coupon__activate-button.activated",
+                                            "button.coupon-call-to-action__button.activated",
+                                            "button.activated"
+                                        ];
+
+                                        var activatedButton = null;
+                                        for (var j = 0; j < activatedButtonSelectors.length && !activatedButton; j++) {
+                                            activatedButton = callToAction.shadowRoot.querySelector(activatedButtonSelectors[j]);
+                                        }
+
                                         if (activatedButton) {
                                             console.log("Coupon " + (i + 1) + " is already activated");
                                         } else {
@@ -237,8 +299,21 @@ class PaybackActivator:
         browser_options.add_argument("--disable-blink-features=AutomationControlled")
         browser_options.add_argument("--window-size=1920,1080")
 
+        # Add options to improve reliability in GitHub Actions
+        if self.is_github_actions:
+            browser_options.add_argument("--no-sandbox")
+            browser_options.add_argument("--disable-dev-shm-usage")
+            browser_options.add_argument("--disable-gpu")
+            browser_options.add_argument("--ignore-certificate-errors")
+            browser_options.add_argument(
+                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            )
+
         if self.headless:
             browser_options.add_argument("--headless")
+            # Add additional headless-specific options for GitHub Actions
+            if self.is_github_actions:
+                browser_options.add_argument("--disable-web-security")
 
         async with Chrome(options=browser_options) as browser:
             await browser.start()
