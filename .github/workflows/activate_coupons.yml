@@ -3,7 +3,7 @@ name: Activate Payback Coupons
 "on":
   schedule:
     # Run every Monday and Thursday at 10:00 AM UTC
-    - cron: "0 10 * * 1,4"
+    - cron: "0 10 * * 1"
   workflow_dispatch:
 
 jobs:
