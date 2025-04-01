@@ -23,7 +23,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb x11-utils x11-xserver-utils libxss1 libgconf-2-4 libappindicator3-1 libasound2
 
       - name: Install uv
         run: |
@@ -39,11 +39,14 @@ jobs:
           PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
           PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
           DISPLAY: ":99.0"
+          GITHUB_ACTIONS: "true"
         run: |
-          # Start virtual display
-          Xvfb :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          # Start virtual display with larger resolution and color depth
+          Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > /dev/null 2>&1 &
           # Wait for Xvfb to start
-          sleep 3
+          sleep 5
+          # Check if display is working
+          xdpyinfo -display :99 > /dev/null || (echo "Xvfb failed to start" && exit 1)
           # Run without headless flag
           uv run activate.py
 
