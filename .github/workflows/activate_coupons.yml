@@ -1,19 +1,30 @@
 name: Activate Payback Coupons
 
-"on":
+on:
   schedule:
     # Run every Monday and Thursday at 10:00 AM UTC
-    - cron: "0 10 * * 1"
+    - cron: "0 10 * * 1,4"
   workflow_dispatch:
 
 jobs:
   activate:
     name: Activate Coupons
     runs-on: macos-latest
+    timeout-minutes: 15 # Prevent hung jobs
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate secrets
+        env:
+          PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
+          PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
+        run: |
+          if [ -z "$PAYBACK_USERNAME" ] || [ -z "$PAYBACK_PASSWORD" ]; then
+            echo "::error::Missing required secrets. Please set PAYBACK_USERNAME and PAYBACK_PASSWORD in your repository secrets."
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -23,6 +34,7 @@ jobs:
       - name: Install system dependencies for macOS
         run: |
           brew install --cask xquartz
+          # Install chrome-cli for better Chrome control
           brew install chrome-cli
 
       - name: Install uv
@@ -35,9 +47,11 @@ jobs:
           uv sync
 
       - name: Activate Payback coupons
+        id: activate
         env:
           PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
           PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
+          GITHUB_ACTIONS: "true" # Explicitly set for script detection
         run: |
           # Start virtual display for macOS
           defaults write org.x.X11 app_to_run /usr/bin/true
@@ -47,7 +61,7 @@ jobs:
           uv run activate.py
 
       - name: Upload activation logs
-        if: always()
+        if: always() # Run even if previous steps failed
         uses: actions/upload-artifact@v4
         with:
           name: activation-logs
@@ -58,7 +72,7 @@ jobs:
           retention-days: 7
 
       - name: Upload screenshots and HTML
-        if: success()
+        if: success() || steps.activate.outputs.status == 'failed' # Upload on success or specific failure
         uses: actions/upload-artifact@v4
         with:
           name: activation-results
@@ -66,3 +80,9 @@ jobs:
             payback_coupons_*.png
             payback_coupons_*.html
           retention-days: 7
+
+      - name: Send notification on failure
+        if: failure()
+        run: |
+          echo "Payback coupon activation workflow failed. Check the logs for details."
+          # You could add additional notification methods here (email, Slack, etc.)
