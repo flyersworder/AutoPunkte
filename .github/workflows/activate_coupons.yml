@@ -33,10 +33,22 @@ jobs:
 
       - name: Setup for Chrome and debugging
         run: |
-          # Use pre-installed Chrome and ChromeDriver
-          echo "Using pre-installed Chrome: $(google-chrome --version)"
-          echo "Using pre-installed ChromeDriver: $(chromedriver --version)"
-          echo "ChromeDriver path: $CHROMEWEBDRIVER"
+          # Check for Chrome on macOS (it's in a different location than Linux)
+          CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [ -f "$CHROME_PATH" ]; then
+            echo "Using pre-installed Chrome: $($CHROME_PATH --version)"
+          else
+            echo "Chrome not found at expected path, checking alternatives"
+            find /Applications -name "Google Chrome*.app" -maxdepth 1
+          fi
+
+          # Check for ChromeDriver
+          if [ -n "$CHROMEWEBDRIVER" ] && [ -f "$CHROMEWEBDRIVER/chromedriver" ]; then
+            echo "Using ChromeDriver: $($CHROMEWEBDRIVER/chromedriver --version)"
+          else
+            echo "ChromeDriver path: $CHROMEWEBDRIVER"
+            find /usr/local -name "chromedriver*" 2>/dev/null || echo "No chromedriver found"
+          fi
 
           # Install xquartz for display support
           brew install --cask xquartz
@@ -61,7 +73,7 @@ jobs:
           GITHUB_ACTIONS: "true" # Explicitly set for script detection
           PYTHONUNBUFFERED: "1" # Ensure Python output is not buffered
           DEBUG: "1" # Enable additional debugging
-          CHROME_PATH: "/usr/bin/google-chrome" # Use pre-installed Chrome
+          CHROME_PATH: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" # macOS Chrome path
         run: |
           # Start virtual display for macOS
           defaults write org.x.X11 app_to_run /usr/bin/true
@@ -73,7 +85,15 @@ jobs:
           uname -a >> debug_info/system_info.txt
           sw_vers >> debug_info/system_info.txt
           echo "Chrome info:" >> debug_info/system_info.txt
-          google-chrome --version >> debug_info/system_info.txt
+
+          # Use the correct path for Chrome on macOS
+          CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          if [ -f "$CHROME_PATH" ]; then
+            "$CHROME_PATH" --version >> debug_info/system_info.txt
+          else
+            echo "Chrome not found at expected path" >> debug_info/system_info.txt
+            ls -la /Applications/Google* >> debug_info/system_info.txt
+          fi
 
           # Run the activation script with more verbose output
           uv run activate.py --log-level DEBUG
