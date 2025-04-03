@@ -382,6 +382,14 @@ class PaybackActivator:
             wait_time = 10 if self.is_github_actions else 5
             self.logger.info(f"Waiting {wait_time} seconds for page to load...")
             await asyncio.sleep(wait_time)
+
+            # Take a screenshot of the initial page
+            initial_screenshot = (
+                f"debug_initial_page_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            )
+            await page.get_screenshot(initial_screenshot)
+            self.logger.info(f"Initial page screenshot saved to {initial_screenshot}")
+
             self.logger.info("Page loaded, looking for cookie consent...")
 
             # Handle cookie consent button
@@ -391,8 +399,24 @@ class PaybackActivator:
                 await button.click()
                 self.logger.info("Clicked cookie consent button")
                 await asyncio.sleep(2)
+
+                # Take a screenshot after cookie handling
+                cookie_screenshot = (
+                    f"debug_after_cookie_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                )
+                await page.get_screenshot(cookie_screenshot)
+                self.logger.info(
+                    f"After cookie handling screenshot saved to {cookie_screenshot}"
+                )
             except Exception as e:
                 self.logger.warning(f"Could not find or click cookie button: {e}")
+
+                # Take a screenshot when cookie button not found
+                no_cookie_screenshot = f"debug_no_cookie_button_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                await page.get_screenshot(no_cookie_screenshot)
+                self.logger.info(
+                    f"No cookie button screenshot saved to {no_cookie_screenshot}"
+                )
 
             # Wait for page to fully load after cookie handling - longer in GitHub Actions
             wait_time = 5 if self.is_github_actions else 3
@@ -453,6 +477,15 @@ class PaybackActivator:
 
             self.logger.info("Successfully entered username")
 
+            # Take a screenshot after entering username
+            username_screenshot = (
+                f"debug_after_username_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            )
+            await page.get_screenshot(username_screenshot)
+            self.logger.info(
+                f"After username entry screenshot saved to {username_screenshot}"
+            )
+
             # Wait a moment before trying to find and click the continue button - longer in GitHub Actions
             wait_time = 5 if self.is_github_actions else 2
             self.logger.info(f"Waiting {wait_time} seconds before clicking continue...")
@@ -507,6 +540,15 @@ class PaybackActivator:
             )
 
             self.logger.info("Clicked continue button")
+
+            # Take a screenshot after clicking continue button
+            continue_screenshot = (
+                f"debug_after_continue_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            )
+            await page.get_screenshot(continue_screenshot)
+            self.logger.info(
+                f"After continue button screenshot saved to {continue_screenshot}"
+            )
 
             # Wait for the password page to load - longer in GitHub Actions
             self.logger.info("Waiting for password page to load...")
@@ -576,6 +618,15 @@ class PaybackActivator:
 
             self.logger.info("Successfully entered password")
 
+            # Take a screenshot after entering password
+            password_screenshot = (
+                f"debug_after_password_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            )
+            await page.get_screenshot(password_screenshot)
+            self.logger.info(
+                f"After password entry screenshot saved to {password_screenshot}"
+            )
+
             # Wait a moment before clicking the login button - longer in GitHub Actions
             wait_time = 5 if self.is_github_actions else 2
             self.logger.info(
@@ -633,6 +684,13 @@ class PaybackActivator:
 
             self.logger.info("Clicked login button")
 
+            # Take a screenshot after clicking login button
+            login_screenshot = f"debug_after_login_click_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            await page.get_screenshot(login_screenshot)
+            self.logger.info(
+                f"After login button screenshot saved to {login_screenshot}"
+            )
+
             # Wait to see the result - significantly longer in GitHub Actions
             self.logger.info("Waiting for login to complete...")
             wait_time = 15 if self.is_github_actions else 5
@@ -667,6 +725,13 @@ class PaybackActivator:
                     f"Waiting {wait_time} additional seconds before proceeding..."
                 )
                 await asyncio.sleep(wait_time)
+
+                # Take a final screenshot after login completion
+                final_login_screenshot = f"debug_login_complete_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                await page.get_screenshot(final_login_screenshot)
+                self.logger.info(
+                    f"Login completion screenshot saved to {final_login_screenshot}"
+                )
 
             except Exception as e:
                 self.logger.error(f"Error checking login status: {e}")
