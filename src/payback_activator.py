@@ -342,7 +342,13 @@ class PaybackActivator:
         # Use pre-installed Chrome in GitHub Actions if available
         if self.is_github_actions and self.chrome_path:
             self.logger.info(f"Using pre-installed Chrome at: {self.chrome_path}")
-            browser_options.set_binary(self.chrome_path)
+            # pydoll doesn't have set_binary method, use binary_location if it exists
+            # or add as an argument if not
+            try:
+                browser_options.binary_location = self.chrome_path
+            except AttributeError:
+                # If binary_location doesn't exist, use chrome path as an argument
+                browser_options.add_argument(f"--binary={self.chrome_path}")
 
         if self.headless:
             browser_options.add_argument("--headless")
