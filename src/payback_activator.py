@@ -51,6 +51,10 @@ class PaybackActivator:
         self.logger = logging.getLogger("PaybackActivator")
         # Detect if running in GitHub Actions
         self.is_github_actions = os.environ.get("GITHUB_ACTIONS") == "true"
+        # Enable debug mode if DEBUG environment variable is set
+        self.debug_mode = os.environ.get("DEBUG") == "1"
+        # Check for custom Chrome path
+        self.chrome_path = os.environ.get("CHROME_PATH")
 
     def _load_config(self):
         """Load configuration from config.yaml file."""
@@ -69,9 +73,15 @@ class PaybackActivator:
         await page.go_to(f"https://www.payback.de/coupons?partnerId={partner_id}")
 
         # Wait longer for coupons to load in GitHub Actions
-        wait_time = 10 if self.is_github_actions else 5
-        self.logger.info(f"Waiting for coupons to load for {wait_time} seconds...")
+        wait_time = 15 if self.is_github_actions else 5
+        self.logger.info(f"Waiting {wait_time} seconds for coupons to load...")
         await asyncio.sleep(wait_time)
+
+        # Take a screenshot before activation attempt for debugging
+        if self.debug_mode or self.is_github_actions:
+            debug_screenshot = f"payback_debug_{partner_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            await page.screenshot(debug_screenshot)
+            self.logger.info(f"Debug screenshot saved to {debug_screenshot}")
 
         # Find and click all "Jetzt aktivieren" buttons
         self.logger.info("Attempting to activate all coupons...")
@@ -80,8 +90,23 @@ class PaybackActivator:
             // Get the coupon center container
             var couponCenter = document.querySelector("#coupon-center");
             if (!couponCenter || !couponCenter.shadowRoot) {
-                console.log("Coupon center not found or no shadow root");
-                window.activationResults = { success: false, error: "Coupon center not found", activated: 0, total: 0 };
+                // Debug the DOM structure to help diagnose issues
+                var debugInfo = {
+                    hasCouponCenter: !!document.querySelector('#coupon-center'),
+                    hasShadowRoot: !!(document.querySelector('#coupon-center') && document.querySelector('#coupon-center').shadowRoot),
+                    bodyContent: document.body.innerHTML.substring(0, 1000), // First 1000 chars of body
+                    urlPath: window.location.href,
+                    title: document.title
+                };
+
+                console.log("Coupon center not found or no shadow root. Debug info:", JSON.stringify(debugInfo));
+                window.activationResults = {
+                    success: false,
+                    error: "Coupon center not found",
+                    activated: 0,
+                    total: 0,
+                    debugInfo: debugInfo
+                };
             } else {
                 // Try multiple selectors for the coupon container to be more robust
                 var selectors = [
@@ -296,18 +321,28 @@ class PaybackActivator:
 
         # Create browser options
         browser_options = Options()
-        browser_options.add_argument("--disable-blink-features=AutomationControlled")
-        browser_options.add_argument("--window-size=1920,1080")
 
-        # Add options to improve reliability in GitHub Actions
-        if self.is_github_actions:
-            browser_options.add_argument("--no-sandbox")
-            browser_options.add_argument("--disable-dev-shm-usage")
-            browser_options.add_argument("--disable-gpu")
-            browser_options.add_argument("--ignore-certificate-errors")
-            browser_options.add_argument(
-                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            )
+        # Set headless mode if requested
+        if self.headless and not self.is_github_actions:
+            browser_options.add_argument("--headless=new")
+
+        # Add additional options for stability
+        browser_options.add_argument("--no-sandbox")
+        browser_options.add_argument("--disable-dev-shm-usage")
+        browser_options.add_argument("--disable-gpu")
+        browser_options.add_argument("--disable-extensions")
+        browser_options.add_argument("--disable-popup-blocking")
+        browser_options.add_argument("--disable-notifications")
+        browser_options.add_argument("--disable-infobars")
+        browser_options.add_argument("--window-size=1920,1080")
+        browser_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+        )
+
+        # Use pre-installed Chrome in GitHub Actions if available
+        if self.is_github_actions and self.chrome_path:
+            self.logger.info(f"Using pre-installed Chrome at: {self.chrome_path}")
+            browser_options.set_binary(self.chrome_path)
 
         if self.headless:
             browser_options.add_argument("--headless")
@@ -323,7 +358,7 @@ class PaybackActivator:
             await page.execute_script(
                 """
                 Object.defineProperty(navigator, 'userAgent', {
-                    get: function () { return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'; }
+                    get: function () { return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'; }
                 });
 
                 // Override properties that automation detection might check
