@@ -120,6 +120,16 @@ jobs:
             payback_coupons_*.html
           retention-days: 7
 
+      - name: Upload debug screenshots
+        if: always() # Always upload debug screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: |
+            debug_*.png
+            payback_debug_*.png
+          retention-days: 7
+
       - name: Send notification on failure
         if: failure()
         run: |
