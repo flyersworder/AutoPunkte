@@ -80,7 +80,7 @@ class PaybackActivator:
         # Take a screenshot before activation attempt for debugging
         if self.debug_mode or self.is_github_actions:
             debug_screenshot = f"payback_debug_{partner_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            await page.screenshot(debug_screenshot)
+            await page.get_screenshot(debug_screenshot)
             self.logger.info(f"Debug screenshot saved to {debug_screenshot}")
 
         # Find and click all "Jetzt aktivieren" buttons
