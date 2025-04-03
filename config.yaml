@@ -8,6 +8,8 @@ merchants:
     partner_id: lp747
   - name: Decathlon
     partner_id: lp732
+  - name: fressnapf
+    partner_id: lp430
   # Add more merchants as needed
   # Partner IDs can be found in the URL when selecting a merchant on the Payback website
   # For example, https://www.payback.de/coupons?partnerId=lp732 for Decathlon
