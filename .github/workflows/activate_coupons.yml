@@ -31,11 +31,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install system dependencies for macOS
+      - name: Setup for Chrome and debugging
         run: |
+          # Use pre-installed Chrome and ChromeDriver
+          echo "Using pre-installed Chrome: $(google-chrome --version)"
+          echo "Using pre-installed ChromeDriver: $(chromedriver --version)"
+          echo "ChromeDriver path: $CHROMEWEBDRIVER"
+
+          # Install xquartz for display support
           brew install --cask xquartz
-          # Install chrome-cli for better Chrome control
-          brew install chrome-cli
+
+          # Create debug directory
+          mkdir -p debug_info
 
       - name: Install uv
         run: |
@@ -52,13 +59,24 @@ jobs:
           PAYBACK_USERNAME: ${{ secrets.PAYBACK_USERNAME }}
           PAYBACK_PASSWORD: ${{ secrets.PAYBACK_PASSWORD }}
           GITHUB_ACTIONS: "true" # Explicitly set for script detection
+          PYTHONUNBUFFERED: "1" # Ensure Python output is not buffered
+          DEBUG: "1" # Enable additional debugging
+          CHROME_PATH: "/usr/bin/google-chrome" # Use pre-installed Chrome
         run: |
           # Start virtual display for macOS
           defaults write org.x.X11 app_to_run /usr/bin/true
           open -a XQuartz
           sleep 5
-          # Run the activation script
-          uv run activate.py
+
+          # Collect system info for debugging
+          echo "System info:" > debug_info/system_info.txt
+          uname -a >> debug_info/system_info.txt
+          sw_vers >> debug_info/system_info.txt
+          echo "Chrome info:" >> debug_info/system_info.txt
+          google-chrome --version >> debug_info/system_info.txt
+
+          # Run the activation script with more verbose output
+          uv run activate.py --log-level DEBUG
 
       - name: Upload activation logs
         if: always() # Run even if previous steps failed
@@ -69,10 +87,11 @@ jobs:
             payback_activation_*.log
             autopunkte.log
             activation_results_*.json
+            debug_info/*
           retention-days: 7
 
       - name: Upload screenshots and HTML
-        if: success() || steps.activate.outputs.status == 'failed' # Upload on success or specific failure
+        if: always() # Always upload screenshots to help with debugging
         uses: actions/upload-artifact@v4
         with:
           name: activation-results
