@@ -378,8 +378,10 @@ class PaybackActivator:
             self.logger.info("Navigating to Payback login page...")
             await page.go_to("https://www.payback.de/login")
 
-            # Wait for page to load
-            await asyncio.sleep(5)
+            # Wait for page to load - longer in GitHub Actions
+            wait_time = 10 if self.is_github_actions else 5
+            self.logger.info(f"Waiting {wait_time} seconds for page to load...")
+            await asyncio.sleep(wait_time)
             self.logger.info("Page loaded, looking for cookie consent...")
 
             # Handle cookie consent button
@@ -392,8 +394,10 @@ class PaybackActivator:
             except Exception as e:
                 self.logger.warning(f"Could not find or click cookie button: {e}")
 
-            # Wait for page to fully load after cookie handling
-            await asyncio.sleep(3)
+            # Wait for page to fully load after cookie handling - longer in GitHub Actions
+            wait_time = 5 if self.is_github_actions else 3
+            self.logger.info(f"Waiting {wait_time} seconds for page to fully load...")
+            await asyncio.sleep(wait_time)
             self.logger.info("Attempting to interact with login form...")
 
             # Access the input element through the nested shadow DOM structure
@@ -449,8 +453,10 @@ class PaybackActivator:
 
             self.logger.info("Successfully entered username")
 
-            # Wait a moment before trying to find and click the continue button
-            await asyncio.sleep(2)
+            # Wait a moment before trying to find and click the continue button - longer in GitHub Actions
+            wait_time = 5 if self.is_github_actions else 2
+            self.logger.info(f"Waiting {wait_time} seconds before clicking continue...")
+            await asyncio.sleep(wait_time)
 
             # Try to find and click the continue button in the shadow DOM
             self.logger.info("Clicking continue button...")
@@ -502,9 +508,11 @@ class PaybackActivator:
 
             self.logger.info("Clicked continue button")
 
-            # Wait for the password page to load
+            # Wait for the password page to load - longer in GitHub Actions
             self.logger.info("Waiting for password page to load...")
-            await asyncio.sleep(5)
+            wait_time = 10 if self.is_github_actions else 5
+            self.logger.info(f"Waiting {wait_time} seconds for password page...")
+            await asyncio.sleep(wait_time)
 
             # Now enter the password using the provided shadow DOM path
             self.logger.info("Accessing password input through nested shadow DOM...")
@@ -568,8 +576,12 @@ class PaybackActivator:
 
             self.logger.info("Successfully entered password")
 
-            # Wait a moment before clicking the login button
-            await asyncio.sleep(2)
+            # Wait a moment before clicking the login button - longer in GitHub Actions
+            wait_time = 5 if self.is_github_actions else 2
+            self.logger.info(
+                f"Waiting {wait_time} seconds before clicking login button..."
+            )
+            await asyncio.sleep(wait_time)
 
             # Click the login button
             self.logger.info("Clicking login button...")
@@ -621,9 +633,11 @@ class PaybackActivator:
 
             self.logger.info("Clicked login button")
 
-            # Wait to see the result
+            # Wait to see the result - significantly longer in GitHub Actions
             self.logger.info("Waiting for login to complete...")
-            await asyncio.sleep(5)
+            wait_time = 15 if self.is_github_actions else 5
+            self.logger.info(f"Waiting {wait_time} seconds for login to complete...")
+            await asyncio.sleep(wait_time)
 
             # Check if login was successful by looking for elements on the page
             self.logger.info("Checking login status...")
@@ -648,7 +662,11 @@ class PaybackActivator:
                 )
 
                 self.logger.info("Login completed.")
-                await asyncio.sleep(5)
+                wait_time = 10 if self.is_github_actions else 5
+                self.logger.info(
+                    f"Waiting {wait_time} additional seconds before proceeding..."
+                )
+                await asyncio.sleep(wait_time)
 
             except Exception as e:
                 self.logger.error(f"Error checking login status: {e}")
