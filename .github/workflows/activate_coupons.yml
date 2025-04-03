@@ -36,7 +36,7 @@ jobs:
           # Check for Chrome on macOS (it's in a different location than Linux)
           CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
           if [ -f "$CHROME_PATH" ]; then
-            echo "Using pre-installed Chrome: $($CHROME_PATH --version)"
+            echo "Using pre-installed Chrome: $("$CHROME_PATH" --version)"
           else
             echo "Chrome not found at expected path, checking alternatives"
             find /Applications -name "Google Chrome*.app" -maxdepth 1
@@ -92,7 +92,7 @@ jobs:
             "$CHROME_PATH" --version >> debug_info/system_info.txt
           else
             echo "Chrome not found at expected path" >> debug_info/system_info.txt
-            ls -la /Applications/Google* >> debug_info/system_info.txt
+            ls -la /Applications/ | grep Google >> debug_info/system_info.txt
           fi
 
           # Run the activation script with more verbose output
