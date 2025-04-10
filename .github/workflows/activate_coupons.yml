@@ -65,6 +65,9 @@ jobs:
         run: |
           uv sync
 
+      - name: Install OpenVPN
+        run: brew install openvpn
+
       - name: Create Mullvad Auth File
         run: |
           echo "${{ secrets.MULLVAD_USER }}" > Mullvad.tblk/mullvad_userpass.txt
