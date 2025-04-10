@@ -65,6 +65,21 @@ jobs:
         run: |
           uv sync
 
+      - name: Create Mullvad Auth File
+        run: |
+          echo "${{ secrets.MULLVAD_USER }}" > Mullvad.tblk/mullvad_userpass.txt
+          echo "m" >> Mullvad.tblk/mullvad_userpass.txt
+        shell: bash
+
+      - name: Connect to VPN for consistent IP
+        uses: kota65535/github-openvpn-connect-action@v2
+        with:
+          config_file: Mullvad.tblk/mullvad_de_ber.conf # Use Mullvad config
+          # Auth is handled by 'auth-user-pass' directive within the .conf file
+
+      - name: Verify VPN Connection
+        run: curl ifconfig.me
+
       - name: Activate Payback coupons
         id: activate
         env:

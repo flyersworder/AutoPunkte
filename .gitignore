@@ -63,3 +63,6 @@ coverage.xml
 
 # Environment variables
 .env
+
+# Ignore Mullvad credentials
+Mullvad.tblk/mullvad_userpass.txt
