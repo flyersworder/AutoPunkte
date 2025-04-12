@@ -153,3 +153,9 @@ jobs:
         run: |
           echo "Payback coupon activation workflow failed. Check the logs for details."
           # You could add additional notification methods here (email, Slack, etc.)
+
+      - name: Send notification on success
+        if: success()
+        run: |
+          echo "Payback coupon activation completed successfully!"
+          # You could add additional notification methods here (email, Slack, etc.)
