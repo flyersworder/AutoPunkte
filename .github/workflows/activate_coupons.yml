@@ -76,6 +76,7 @@ jobs:
 
       - name: Connect to VPN for consistent IP
         uses: kota65535/github-openvpn-connect-action@v2
+        continue-on-error: true
         with:
           config_file: Mullvad.tblk/mullvad_de_ber.conf # Use Mullvad config
           # Auth is handled by 'auth-user-pass' directive within the .conf file
