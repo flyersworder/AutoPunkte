@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 import sys
 from datetime import datetime
 
@@ -326,7 +327,7 @@ class PaybackActivator:
         if self.headless and not self.is_github_actions:
             browser_options.add_argument("--headless=new")
 
-        # Add additional options for stability
+        # Enhanced stealth options
         browser_options.add_argument("--no-sandbox")
         browser_options.add_argument("--disable-dev-shm-usage")
         browser_options.add_argument("--disable-gpu")
@@ -334,10 +335,28 @@ class PaybackActivator:
         browser_options.add_argument("--disable-popup-blocking")
         browser_options.add_argument("--disable-notifications")
         browser_options.add_argument("--disable-infobars")
-        browser_options.add_argument("--window-size=1920,1080")
+        browser_options.add_argument("--disable-blink-features=AutomationControlled")
+        browser_options.add_argument("--disable-web-security")
         browser_options.add_argument(
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+            "--disable-features=IsolateOrigins,site-per-process"
         )
+        browser_options.add_argument("--disable-site-isolation-trials")
+
+        # Enhanced window size and language settings
+        browser_options.add_argument("--window-size=1920,1080")
+        browser_options.add_argument("--start-maximized")
+        browser_options.add_argument("--lang=en-US,en;q=0.9")
+
+        # Common user agents (rotate these if needed)
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+        ]
+        browser_options.add_argument(f"--user-agent={secrets.choice(user_agents)}")
+
+        # Additional headers
+        browser_options.add_argument("--accept-language=en-US,en;q=0.9")
 
         # Use pre-installed Chrome in GitHub Actions if available
         if self.is_github_actions and self.chrome_path:
